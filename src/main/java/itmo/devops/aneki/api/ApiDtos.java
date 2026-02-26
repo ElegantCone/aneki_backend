@@ -1,12 +1,14 @@
 package itmo.devops.aneki.api;
 
+import java.util.UUID;
+
 record LoginRequest(String email, String password) {
 }
 
 record SignupRequest(String name, String email, String password) {
 }
 
-record UserDto(String id, String name, String email) {
+record UserDto(UUID id, String name, String email) {
 }
 
 record AuthResponse(String token, UserDto user) {
@@ -16,10 +18,9 @@ record MeResponse(UserDto user) {
 }
 
 record JokeDto(
-        String id,
-        String userId,
-        String userName,
-        String content,
+        UUID id,
+        UUID userId,
+        String joke,
         long createdAt,
         long updatedAt
 ) {

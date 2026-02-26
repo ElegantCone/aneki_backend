@@ -3,62 +3,67 @@ package itmo.devops.aneki.service;
 import itmo.devops.aneki.error.ApiException;
 import itmo.devops.aneki.model.Joke;
 import itmo.devops.aneki.model.User;
+import itmo.devops.aneki.repository.JokeRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.UUID;
 
 @Service
 public class JokeService {
 
-    private final Map<String, Joke> jokesById = new ConcurrentHashMap<>();
-    private final AtomicLong jokeSeq = new AtomicLong(1);
+    private final JokeRepository jokeRepository;
 
-    public List<Joke> list() {
-        return jokesById.values().stream()
-                .sorted(Comparator.comparingLong(Joke::createdAt).reversed())
-                .toList();
+    public JokeService(JokeRepository jokeRepository) {
+        this.jokeRepository = jokeRepository;
     }
 
+    @Transactional(readOnly = true)
+    public List<Joke> list() {
+        return jokeRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    @Transactional
     public Joke create(User author, String content) {
         String safeContent = requireContent(content);
         long now = Instant.now().toEpochMilli();
-        String id = "j_" + jokeSeq.getAndIncrement();
-        Joke joke = new Joke(id, author.id(), author.name(), safeContent, now, now);
-        jokesById.put(id, joke);
-        return joke;
+        Joke joke = new Joke(
+                UUID.randomUUID(),
+                author.getId(),
+                safeContent,
+                now,
+                now
+        );
+        return jokeRepository.save(joke);
     }
 
+    @Transactional
     public Joke update(User actor, String jokeId, String content) {
         String safeContent = requireContent(content);
         Joke existing = getRequired(jokeId);
         requireOwner(actor, existing);
-        Joke updated = existing.withContent(safeContent, Instant.now().toEpochMilli());
-        jokesById.put(jokeId, updated);
-        return updated;
+        existing.setJoke(safeContent);
+        existing.setUpdatedAt(Instant.now().toEpochMilli());
+        return jokeRepository.save(existing);
     }
 
+    @Transactional
     public void delete(User actor, String jokeId) {
         Joke existing = getRequired(jokeId);
         requireOwner(actor, existing);
-        jokesById.remove(jokeId);
+        jokeRepository.delete(existing);
     }
 
     private Joke getRequired(String jokeId) {
-        Joke joke = jokesById.get(jokeId);
-        if (joke == null) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Joke not found");
-        }
-        return joke;
+        return jokeRepository.findById(jokeId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Joke not found"));
     }
 
     private void requireOwner(User actor, Joke joke) {
-        if (!joke.userId().equals(actor.id())) {
+        if (joke.getUserId() != actor.getId()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can modify only your own jokes");
         }
     }

@@ -65,12 +65,11 @@ public class JokeController {
 
     private JokeDto toDto(Joke joke) {
         return new JokeDto(
-                joke.id(),
-                joke.userId(),
-                joke.userName(),
-                joke.content(),
-                joke.createdAt(),
-                joke.updatedAt()
+                joke.getId(),
+                joke.getUserId(),
+                joke.getJoke(),
+                joke.getCreatedAt(),
+                joke.getUpdatedAt()
         );
     }
 }

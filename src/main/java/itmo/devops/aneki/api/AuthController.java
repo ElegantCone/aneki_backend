@@ -39,6 +39,6 @@ public class AuthController {
     }
 
     private UserDto toUserDto(User user) {
-        return new UserDto(user.id(), user.name(), user.email());
+        return new UserDto(user.getId(), user.getName(), user.getEmail());
     }
 }

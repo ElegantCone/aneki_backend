@@ -2,67 +2,66 @@ package itmo.devops.aneki.service;
 
 import itmo.devops.aneki.error.ApiException;
 import itmo.devops.aneki.model.User;
+import itmo.devops.aneki.repository.UserRepository;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.token.Sha512DigestUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class AuthService {
 
-    private final Map<String, User> usersById = new ConcurrentHashMap<>();
-    private final Map<String, String> userIdByEmail = new ConcurrentHashMap<>();
-    private final Map<String, String> userIdByToken = new ConcurrentHashMap<>();
-    private final AtomicLong userSeq = new AtomicLong(1);
+    private final UserRepository userRepository;
+    private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public AuthService() {
-        //todo for testing only, remove later
-        signup("Анна", "user@example.com", "secret");
+    public AuthService(UserRepository userRepository, JwtService jwtService) {
+        this.userRepository = userRepository;
+        this.jwtService = jwtService;
     }
 
+    @Transactional
     public AuthResult signup(String name, String email, String password) {
         String normalizedEmail = normalizeEmail(email);
         String safeName = requireNonBlank(name, "name");
         String safePassword = requireNonBlank(password, "password");
 
-        if (userIdByEmail.containsKey(normalizedEmail)) {
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new ApiException(HttpStatus.CONFLICT, "User with this email already exists");
         }
 
-        String userId = "u_" + userSeq.getAndIncrement();
-        User user = new User(userId, safeName, normalizedEmail, passwordEncoder.encode(safePassword));
-        usersById.put(userId, user);
-        userIdByEmail.put(normalizedEmail, userId);
+        User user = new User(
+                UUID.randomUUID(),
+                safeName,
+                normalizedEmail,
+                passwordEncoder.encode(safePassword)
+        );
+        userRepository.save(user);
 
-        String token = issueToken(userId);
+        String token = jwtService.issueToken(user);
         return new AuthResult(token, user);
     }
 
+    @Transactional(readOnly = true)
     public AuthResult login(String email, String password) {
         String normalizedEmail = normalizeEmail(email);
         String safePassword = requireNonBlank(password, "password");
-        String userId = userIdByEmail.get(normalizedEmail);
-        if (userId == null) {
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
+        if (!passwordEncoder.matches(safePassword, user.getPasswordHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
-        User user = usersById.get(userId);
-        if (user == null || !passwordEncoder.matches(safePassword, user.passwordHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
-        }
-
-        String token = issueToken(user.id());
+        String token = jwtService.issueToken(user);
         return new AuthResult(token, user);
     }
 
+    @Transactional(readOnly = true)
     public User requireUserFromAuthorizationHeader(String authorizationHeader) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing Authorization header");
@@ -76,22 +75,10 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
         }
 
-        String userId = userIdByToken.get(token);
-        if (userId == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
-        }
+        String userId = jwtService.extractUserId(token);
 
-        User user = usersById.get(userId);
-        if (user == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
-        }
-        return user;
-    }
-
-    private String issueToken(String userId) {
-        String token = UUID.randomUUID().toString();
-        userIdByToken.put(token, userId);
-        return token;
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token"));
     }
 
     private String normalizeEmail(String email) {
