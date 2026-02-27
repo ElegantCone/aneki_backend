@@ -45,7 +45,7 @@ public class JokeService {
         String safeContent = requireContent(content);
         Joke existing = getRequired(jokeId);
         requireOwner(actor, existing);
-        existing.setJoke(safeContent);
+        existing.setContent(safeContent);
         existing.setUpdatedAt(Instant.now().toEpochMilli());
         return jokeRepository.save(existing);
     }
@@ -58,12 +58,16 @@ public class JokeService {
     }
 
     private Joke getRequired(String jokeId) {
-        return jokeRepository.findById(jokeId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Joke not found"));
+        try {
+            return jokeRepository.findById(UUID.fromString(jokeId))
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Joke not found"));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Joke not found");
+        }
     }
 
     private void requireOwner(User actor, Joke joke) {
-        if (joke.getUserId() != actor.getId()) {
+        if (!joke.getUserId().equals(actor.getId())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can modify only your own jokes");
         }
     }

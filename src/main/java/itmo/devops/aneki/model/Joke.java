@@ -23,7 +23,7 @@ public class Joke {
 
     @Setter
     @Column(nullable = false)
-    private String joke;
+    private String content;
 
     @Column(name = "created_at", nullable = false)
     private long createdAt;
@@ -35,10 +35,10 @@ public class Joke {
     protected Joke() {
     }
 
-    public Joke(UUID id, UUID userId, String joke, long createdAt, long updatedAt) {
+    public Joke(UUID id, UUID userId, String content, long createdAt, long updatedAt) {
         this.id = id;
         this.userId = userId;
-        this.joke = joke;
+        this.content = content;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }

@@ -60,7 +60,8 @@ public class JokeController {
         return new JokeDto(
                 joke.getId(),
                 joke.getUserId(),
-                joke.getJoke(),
+                authService.requireUserById(joke.getUserId().toString()).getName(),
+                joke.getContent(),
                 joke.getCreatedAt(),
                 joke.getUpdatedAt()
         );

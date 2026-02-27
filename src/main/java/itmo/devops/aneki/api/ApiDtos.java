@@ -1,5 +1,6 @@
 package itmo.devops.aneki.api;
 
+import java.util.List;
 import java.util.UUID;
 
 record LoginRequest(String email, String password) {
@@ -20,13 +21,14 @@ record MeResponse(UserDto user) {
 record JokeDto(
         UUID id,
         UUID userId,
-        String joke,
+        String username,
+        String content,
         long createdAt,
         long updatedAt
 ) {
 }
 
-record JokesResponse(java.util.List<JokeDto> jokes) {
+record JokesResponse(List<JokeDto> jokes) {
 }
 
 record JokeResponse(JokeDto joke) {
