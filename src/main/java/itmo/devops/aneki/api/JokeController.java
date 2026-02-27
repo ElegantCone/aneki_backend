@@ -4,15 +4,8 @@ import itmo.devops.aneki.model.Joke;
 import itmo.devops.aneki.model.User;
 import itmo.devops.aneki.service.AuthService;
 import itmo.devops.aneki.service.JokeService;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/jokes")
@@ -27,17 +20,17 @@ public class JokeController {
     }
 
     @GetMapping
-    public JokesResponse list(@RequestHeader(name = "Authorization", required = false) String authorizationHeader) {
-        authService.requireUserFromAuthorizationHeader(authorizationHeader);
+    public JokesResponse list(Authentication authentication) {
+        authService.requireUserById(authentication.getName());
         return new JokesResponse(jokeService.list().stream().map(this::toDto).toList());
     }
 
     @PostMapping
     public JokeResponse create(
-            @RequestHeader(name = "Authorization", required = false) String authorizationHeader,
+            Authentication authentication,
             @RequestBody JokeUpsertRequest request
     ) {
-        User user = authService.requireUserFromAuthorizationHeader(authorizationHeader);
+        User user = authService.requireUserById(authentication.getName());
         Joke joke = jokeService.create(user, request.content());
         return new JokeResponse(toDto(joke));
     }
@@ -45,10 +38,10 @@ public class JokeController {
     @PutMapping("/{id}")
     public JokeResponse update(
             @PathVariable String id,
-            @RequestHeader(name = "Authorization", required = false) String authorizationHeader,
+            Authentication authentication,
             @RequestBody JokeUpsertRequest request
     ) {
-        User user = authService.requireUserFromAuthorizationHeader(authorizationHeader);
+        User user = authService.requireUserById(authentication.getName());
         Joke joke = jokeService.update(user, id, request.content());
         return new JokeResponse(toDto(joke));
     }
@@ -56,9 +49,9 @@ public class JokeController {
     @DeleteMapping("/{id}")
     public OkResponse delete(
             @PathVariable String id,
-            @RequestHeader(name = "Authorization", required = false) String authorizationHeader
+            Authentication authentication
     ) {
-        User user = authService.requireUserFromAuthorizationHeader(authorizationHeader);
+        User user = authService.requireUserById(authentication.getName());
         jokeService.delete(user, id);
         return new OkResponse(true);
     }

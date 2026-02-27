@@ -63,22 +63,43 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public User requireUserFromAuthorizationHeader(String authorizationHeader) {
+        return requireUser(authorizationHeader, null);
+    }
+
+    @Transactional(readOnly = true)
+    public User requireUser(String authorizationHeader, String cookieToken) {
+        String token = extractToken(authorizationHeader, cookieToken);
+        String userId = jwtService.extractUserId(token);
+
+        return userRepository.findById(UUID.fromString(userId))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+    }
+
+    @Transactional(readOnly = true)
+    public User requireUserById(String userId) {
+        try {
+            return userRepository.findById(UUID.fromString(userId))
+                    .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
+        }
+    }
+
+    private String extractToken(String authorizationHeader, String cookieToken) {
+        if (cookieToken != null && !cookieToken.isBlank()) {
+            return cookieToken.trim();
+        }
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing Authorization header");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing authentication token");
         }
         if (!authorizationHeader.startsWith("Bearer ")) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid Authorization header");
         }
-
         String token = authorizationHeader.substring("Bearer ".length()).trim();
         if (token.isEmpty()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
         }
-
-        String userId = jwtService.extractUserId(token);
-
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token"));
+        return token;
     }
 
     private String normalizeEmail(String email) {

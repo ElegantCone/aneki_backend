@@ -1,6 +1,7 @@
 package itmo.devops.aneki.config;
 
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -13,6 +14,12 @@ import org.springframework.context.annotation.Configuration;
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
         bearerFormat = "Bearer token"
+)
+@SecurityScheme(
+        name = "cookieAuth",
+        type = SecuritySchemeType.APIKEY,
+        in = SecuritySchemeIn.COOKIE,
+        paramName = "access_token"
 )
 public class OpenApiConfig {
 
