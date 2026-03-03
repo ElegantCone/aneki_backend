@@ -4,14 +4,16 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "jokes")
 @Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Joke {
 
     @Id
@@ -32,15 +34,12 @@ public class Joke {
     @Column(name = "updated_at", nullable = false)
     private long updatedAt;
 
-    protected Joke() {
-    }
-
-    public Joke(UUID id, UUID userId, String content, long createdAt, long updatedAt) {
+    public Joke(UUID id, UUID userId, String content) {
         this.id = id;
         this.userId = userId;
         this.content = content;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
+        this.createdAt = Instant.now().toEpochMilli();
+        this.updatedAt = Instant.now().toEpochMilli();
     }
 
 }

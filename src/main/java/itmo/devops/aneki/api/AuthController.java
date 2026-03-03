@@ -1,8 +1,10 @@
 package itmo.devops.aneki.api;
 
+import itmo.devops.aneki.api.dto.*;
 import itmo.devops.aneki.model.User;
 import itmo.devops.aneki.service.AuthService;
 import itmo.devops.aneki.service.AuthService.AuthResult;
+import jakarta.annotation.Nonnull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+
+import static itmo.devops.aneki.api.dto.UserDto.toUserDto;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -87,9 +91,5 @@ public class AuthController {
                 .sameSite(authCookieSameSite)
                 .maxAge(Duration.ZERO)
                 .build();
-    }
-
-    private UserDto toUserDto(User user) {
-        return new UserDto(user.getId(), user.getName(), user.getEmail());
     }
 }

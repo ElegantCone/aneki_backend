@@ -1,13 +1,18 @@
 package itmo.devops.aneki.model;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
 @Getter
+@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
     @Id
@@ -22,14 +27,4 @@ public class User {
 
     @Column(name = "password", nullable = false)
     private String passwordHash;
-
-    protected User() {
-    }
-
-    public User(UUID id, String name, String email, String passwordHash) {
-        this.id = id;
-        this.name = name;
-        this.email = email;
-        this.passwordHash = passwordHash;
-    }
 }

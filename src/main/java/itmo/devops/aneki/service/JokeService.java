@@ -4,6 +4,7 @@ import itmo.devops.aneki.error.ApiException;
 import itmo.devops.aneki.model.Joke;
 import itmo.devops.aneki.model.User;
 import itmo.devops.aneki.repository.JokeRepository;
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,13 +14,10 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-public class JokeService {
+@AllArgsConstructor
+public class JokeService extends ServiceHelper {
 
     private final JokeRepository jokeRepository;
-
-    public JokeService(JokeRepository jokeRepository) {
-        this.jokeRepository = jokeRepository;
-    }
 
     @Transactional(readOnly = true)
     public List<Joke> list() {
@@ -28,24 +26,17 @@ public class JokeService {
 
     @Transactional
     public Joke create(User author, String content) {
-        String safeContent = requireContent(content);
-        long now = Instant.now().toEpochMilli();
-        Joke joke = new Joke(
-                UUID.randomUUID(),
-                author.getId(),
-                safeContent,
-                now,
-                now
-        );
+        requireNonBlank(content, "content", true);
+        Joke joke = new Joke(UUID.randomUUID(), author.getId(), content);
         return jokeRepository.save(joke);
     }
 
     @Transactional
     public Joke update(User actor, String jokeId, String content) {
-        String safeContent = requireContent(content);
+        requireNonBlank(content, "content", true);
         Joke existing = getRequired(jokeId);
         requireOwner(actor, existing);
-        existing.setContent(safeContent);
+        existing.setContent(content);
         existing.setUpdatedAt(Instant.now().toEpochMilli());
         return jokeRepository.save(existing);
     }
@@ -70,12 +61,5 @@ public class JokeService {
         if (!joke.getUserId().equals(actor.getId())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "You can modify only your own jokes");
         }
-    }
-
-    private String requireContent(String content) {
-        if (content == null || content.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Field 'content' is required");
-        }
-        return content.trim();
     }
 }

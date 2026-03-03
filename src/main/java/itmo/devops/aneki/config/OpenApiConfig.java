@@ -10,12 +10,6 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @SecurityScheme(
-        name = "bearerAuth",
-        type = SecuritySchemeType.HTTP,
-        scheme = "bearer",
-        bearerFormat = "Bearer token"
-)
-@SecurityScheme(
         name = "cookieAuth",
         type = SecuritySchemeType.APIKEY,
         in = SecuritySchemeIn.COOKIE,
@@ -29,6 +23,6 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("ANEKI Backend API")
                         .version("v1")
-                        .description("Backend API for ANEKI frontend"));
+                        .description("Backend API"));
     }
 }

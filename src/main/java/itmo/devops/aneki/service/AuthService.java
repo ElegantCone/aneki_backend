@@ -3,43 +3,38 @@ package itmo.devops.aneki.service;
 import itmo.devops.aneki.error.ApiException;
 import itmo.devops.aneki.model.User;
 import itmo.devops.aneki.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.Locale;
 import java.util.UUID;
 
 @Service
-public class AuthService {
+@RequiredArgsConstructor
+public class AuthService extends ServiceHelper {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public AuthService(UserRepository userRepository, JwtService jwtService) {
-        this.userRepository = userRepository;
-        this.jwtService = jwtService;
-    }
-
     @Transactional
     public AuthResult signup(String name, String email, String password) {
-        String normalizedEmail = normalizeEmail(email);
-        String safeName = requireNonBlank(name, "name");
-        String safePassword = requireNonBlank(password, "password");
+        requireNonBlank(email, "email", false);
+        requireNonBlank(name, "name", false);
+        requireNonBlank(password, "password", false);
 
-        if (userRepository.existsByEmail(normalizedEmail)) {
+        if (userRepository.existsByEmail(email)) {
             throw new ApiException(HttpStatus.CONFLICT, "User with this email already exists");
         }
 
         User user = new User(
                 UUID.randomUUID(),
-                safeName,
-                normalizedEmail,
-                passwordEncoder.encode(safePassword)
+                name,
+                email,
+                passwordEncoder.encode(password)
         );
         userRepository.save(user);
 
@@ -49,30 +44,16 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResult login(String email, String password) {
-        String normalizedEmail = normalizeEmail(email);
-        String safePassword = requireNonBlank(password, "password");
-        User user = userRepository.findByEmail(normalizedEmail)
+        requireNonBlank(email, "email", false);
+        requireNonBlank(password, "password", false);
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
-        if (!passwordEncoder.matches(safePassword, user.getPasswordHash())) {
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
         String token = jwtService.issueToken(user);
         return new AuthResult(token, user);
-    }
-
-    @Transactional(readOnly = true)
-    public User requireUserFromAuthorizationHeader(String authorizationHeader) {
-        return requireUser(authorizationHeader, null);
-    }
-
-    @Transactional(readOnly = true)
-    public User requireUser(String authorizationHeader, String cookieToken) {
-        String token = extractToken(authorizationHeader, cookieToken);
-        String userId = jwtService.extractUserId(token);
-
-        return userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token"));
     }
 
     @Transactional(readOnly = true)
@@ -83,35 +64,6 @@ public class AuthService {
         } catch (IllegalArgumentException e) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
         }
-    }
-
-    private String extractToken(String authorizationHeader, String cookieToken) {
-        if (cookieToken != null && !cookieToken.isBlank()) {
-            return cookieToken.trim();
-        }
-        if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing authentication token");
-        }
-        if (!authorizationHeader.startsWith("Bearer ")) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid Authorization header");
-        }
-        String token = authorizationHeader.substring("Bearer ".length()).trim();
-        if (token.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
-        }
-        return token;
-    }
-
-    private String normalizeEmail(String email) {
-        String value = requireNonBlank(email, "email");
-        return value.toLowerCase(Locale.ROOT);
-    }
-
-    private String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Field '" + field + "' is required");
-        }
-        return value.trim();
     }
 
     public record AuthResult(String token, User user) {

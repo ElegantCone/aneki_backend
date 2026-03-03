@@ -1,4 +1,0 @@
-{
-  "url": "jdbc:postgresql://localhost:5432/aneki",
-  "_comment": "todo: replace to dockerfile"
-}
