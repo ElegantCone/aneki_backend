@@ -1,0 +1,29 @@
+- name: Deploy application
+  hosts: app
+  become: true
+
+  vars:
+    docker_user: root
+
+  tasks:
+
+    - name: Login to Timeweb Container Registry
+      shell: echo "{{ registry_token }}" | docker login {{ registry_host }} -u "{{ registry_user }}" --password-stdin
+      no_log: true
+
+    - name: Create env file for compose
+      copy:
+        dest: /opt/aneki/.env
+        content: |
+          IMAGE_TAG={{ image_tag }}
+        mode: "0600"
+
+    - name: Pull images
+      command: docker compose -f /opt/aneki/docker-compose.yaml pull
+      args:
+        chdir: /opt/aneki
+
+    - name: Start application
+      command: docker compose -f /opt/aneki/docker-compose.yaml up -d
+      args:
+        chdir: /opt/aneki

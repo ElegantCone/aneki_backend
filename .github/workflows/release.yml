@@ -1,0 +1,65 @@
+name: Release All
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish_frontend:
+    uses: ElegantCone/aneki_frontend/.github/workflows/publish.yml@main
+    with:
+      image_tag: ${{ github.sha }}
+      registry_host: aneki-registry.registry.twcstorage.ru
+      image_name: prod/aneki-frontend
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  publish_backend:
+    uses: ElegantCone/aneki/.github/workflows/publish.yml@main
+    needs: publish_frontend
+    with:
+      image_tag: ${{ github.sha }}
+      registry_host: aneki-registry.registry.twcstorage.ru
+      image_name: prod/aneki-backend
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  deploy:
+    name: Deploy via Ansible
+    runs-on: ubuntu-latest
+    needs:
+      - publish_frontend
+      - publish_backend
+
+    steps:
+      - name: Checkout backend repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run deploy playbook
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          ansible-playbook \
+            -i prod/ansible/inventory.ini \
+            prod/ansible/deploy.yml \
+            --extra-vars "image_tag=${{ github.sha }} registry_host=aneki-registry.registry.twcstorage.ru registry_user=${{ secrets.REGISTRY_USERNAME }} registry_token=${{ secrets.REGISTRY_TOKEN }}"
+  

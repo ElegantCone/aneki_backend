@@ -1,0 +1,103 @@
+- name: Install Docker on VM
+  hosts: app
+  become: true
+
+  vars:
+    docker_user: root
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install dependencies
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+
+    - name: Create keyrings directory
+      file:
+        path: /etc/app/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Update apt cache after Docker repository
+      apt:
+        update_cache: true
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Enable Docker service
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Add user to docker group
+      user:
+        name: "{{ docker_user }}"
+        groups: docker
+        append: true
+
+    - name: Create app directory
+      file:
+        path: /opt/aneki
+        state: directory
+        mode: "0755"
+
+    - name: Copy production compose file
+      copy:
+        src: ../docker-compose.yaml
+        dest: /opt/aneki/docker-compose.yaml
+        mode: "0644"
+
+    - name: Create init directory
+      file:
+        path: /opt/aneki/prod/db_init
+        state: directory
+        mode: "0755"
+
+    - name: Copy postgres init script
+      copy:
+        src: ../db_init/db_init.sql
+        dest: /opt/aneki/prod/db_init/db_init.sql
+        mode: "0644"
+
+
+    - name: Login to Timeweb Container Registry
+      shell: echo "{{ registry_token }}" | docker login {{ registry_host }} -u "{{ registry_user }}" --password-stdin
+      no_log: true
+
+    - name: Pull images
+      command: docker compose -f /opt/aneki/docker-compose.yaml pull
+      args:
+        chdir: /opt/aneki
+
+    - name: Start application
+      command: docker compose -f /opt/aneki/docker-compose.yaml up -d
+      args:
+        chdir: /opt/aneki
