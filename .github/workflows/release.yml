@@ -18,7 +18,7 @@ jobs:
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
 
   publish_backend:
-    uses: ElegantCone/aneki/.github/workflows/publish.yml@main
+    uses: ElegantCone/aneki_backend/.github/workflows/publish.yml@main
     needs: publish_frontend
     with:
       image_tag: ${{ github.sha }}
