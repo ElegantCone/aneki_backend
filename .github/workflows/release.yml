@@ -38,6 +38,9 @@ jobs:
     steps:
       - name: Checkout backend repo
         uses: actions/checkout@v4
+        with:
+          repository: ElegantCone/aneki_backend
+          ref: master
 
       - name: Set up Python
         uses: actions/setup-python@v5
