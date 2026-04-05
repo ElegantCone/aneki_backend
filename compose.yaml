@@ -21,6 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    platform: linux/amd64
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,6 +42,7 @@ services:
     build:
       context: ../aneki_frontend
       dockerfile: Dockerfile
+    platform: linux/amd64
     restart: unless-stopped
     depends_on:
       - backend
