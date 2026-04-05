@@ -8,7 +8,7 @@ on:
 
 jobs:
   publish_frontend:
-    uses: ElegantCone/aneki_frontend/.github/workflows/publish.yml@main
+    uses: ElegantCone/aneki_frontend/.github/workflows/publish.yml@master
     with:
       image_tag: ${{ github.sha }}
       registry_host: aneki-registry.registry.twcstorage.ru
@@ -18,7 +18,7 @@ jobs:
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
 
   publish_backend:
-    uses: ElegantCone/aneki_backend/.github/workflows/publish.yml@main
+    uses: ElegantCone/aneki_backend/.github/workflows/publish.yml@master
     needs: publish_frontend
     with:
       image_tag: ${{ github.sha }}
