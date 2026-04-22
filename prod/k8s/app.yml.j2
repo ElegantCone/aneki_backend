@@ -92,7 +92,7 @@ spec:
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "update"
             - name: SPRING_AUTOCONFIGURE_EXCLUDE
-              value: "org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration"
+              value: "org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration"
             - name: SERVER_FORWARD_HEADERS_STRATEGY
               value: "framework"
           ports:
