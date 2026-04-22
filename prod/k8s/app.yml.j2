@@ -93,6 +93,8 @@ spec:
               value: "update"
             - name: SPRING_AUTOCONFIGURE_EXCLUDE
               value: "org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration"
+            - name: SERVER_FORWARD_HEADERS_STRATEGY
+              value: "framework"
           ports:
             - containerPort: 8080
 ---
