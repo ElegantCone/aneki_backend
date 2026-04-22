@@ -1,0 +1,117 @@
+# --- 1. База данных PostgreSQL ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - name: POSTGRES_DB
+              value: aneki
+            - name: POSTGRES_USER
+              value: elegantcone
+            - name: POSTGRES_PASSWORD
+              value: aneki_password
+          ports:
+            - containerPort: 5432
+---
+# --- 2. Бэкенд (Java) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      imagePullSecrets:
+        - name: twc-registry-key
+      containers:
+        - name: backend
+          # Ansible подставит сюда registry_host и image_tag
+          image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
+          env:
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "aneki"
+            - name: DB_USER
+              value: "elegantcone"
+            - name: DB_PASSWORD
+              value: "aneki_password"
+            - name: JWT_SECRET
+              value: "change-this-prod-secret-to-at-least-32-characters"
+          ports:
+            - containerPort: 8080
+---
+# --- 3. Фронтенд (Nginx) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  type: NodePort # Делаем приложение доступным снаружи
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080 # Сайт будет доступен на порту 30080
+  selector:
+    app: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      imagePullSecrets:
+        - name: twc-registry-key
+      containers:
+        - name: frontend
+          image: {{ registry_host }}/prod/aneki-frontend:{{ image_tag }}
+          ports:
+            - containerPort: 80
