@@ -73,6 +73,8 @@ spec:
         - name: backend
           image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
           env:
+            - name: PORT
+              value: "8080"
             - name: DB_HOST
               value: "postgres"
             - name: DB_PORT
@@ -87,6 +89,10 @@ spec:
               value: "change-this-prod-secret-to-at-least-32-characters"
             - name: CORS_ALLOWED_ORIGIN
               value: "*"
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"
+            - name: SPRING_AUTOCONFIGURE_EXCLUDE
+              value: "org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration"
           ports:
             - containerPort: 8080
 ---
