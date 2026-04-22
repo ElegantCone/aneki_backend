@@ -10,6 +10,12 @@
         path: "{{ k8s_dir }}"
         state: directory
 
+    - name: Create ConfigMap for DB Init script
+      shell: |
+        kubectl create configmap postgres-init-config \
+          --from-file=prod/db_init/db_init.sql \
+          --dry-run=client -o yaml | kubectl apply -f -
+
     - name: Create Registry Secret (if it does not exist)
       shell: |
         kubectl create secret docker-registry twc-registry-key \
