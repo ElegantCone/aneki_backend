@@ -78,7 +78,7 @@ spec:
           image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
           resources:
             requests:
-              cpu: "250"
+              cpu: "250m"
               memory: "512Mi"
             limits:
               cpu: "800m"
