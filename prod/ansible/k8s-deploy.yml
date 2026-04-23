@@ -5,10 +5,10 @@
     k8s_dir: /opt/aneki/k8s
 
   tasks:
-    - name: Ensure manifest directory exists
-      file:
-        path: "{{ k8s_dir }}"
-        state: directory
+    - name: Install Metrics Server
+      shell: |
+        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+        kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 
     - name: Copy SQL init script to server
       copy:
