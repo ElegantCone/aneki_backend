@@ -19,17 +19,16 @@
     - name: Add Prometheus repo
       shell: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo update
 
-    - name: Install Minimal Prometheus Stack
+    - name: Deploy Prometheus
       shell: |
         helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
           --namespace monitoring --create-namespace \
-          --set prometheus.prometheusSpec.resources.requests.memory=300Mi \
-          --set prometheus.prometheusSpec.resources.limits.memory=500Mi \
-          --set prometheus.prometheusSpec.retention=6h \
+          --set prometheus.prometheusSpec.resources.limits.memory=400Mi \
           --set grafana.service.type=NodePort \
           --set grafana.service.nodePort=30090 \
-          --set alertmanager.enabled=false \
-          --set prometheusOperator.createCustomResource=false
+          --set prometheus-node-exporter.enabled=false \
+          --set kube-state-metrics.enabled=false \
+          --set alertmanager.enabled=false
 
     - name: Copy SQL init script to server
       copy:

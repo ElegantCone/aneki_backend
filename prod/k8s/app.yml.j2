@@ -78,11 +78,17 @@ spec:
           image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
           resources:
             requests:
-              cpu: "100m"
-              memory: "400Mi"
+              cpu: "250"
+              memory: "512Mi"
             limits:
-              cpu: "500m"
-              memory: "600Mi"
+              cpu: "800m"
+              memory: "800Mi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
           env:
             - name: PORT
               value: "8080"
