@@ -10,6 +10,27 @@
         kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
         kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 
+    - name: Install Helm
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add Prometheus repo
+      shell: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo update
+
+    - name: Install Minimal Prometheus Stack
+      shell: |
+        helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+          --namespace monitoring --create-namespace \
+          --set prometheus.prometheusSpec.resources.requests.memory=300Mi \
+          --set prometheus.prometheusSpec.resources.limits.memory=500Mi \
+          --set prometheus.prometheusSpec.retention=6h \
+          --set grafana.service.type=NodePort \
+          --set grafana.service.nodePort=30090 \
+          --set alertmanager.enabled=false \
+          --set prometheusOperator.createCustomResource=false
+
     - name: Copy SQL init script to server
       copy:
         src: "../db_init/db_init.sql"
