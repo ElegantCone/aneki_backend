@@ -1,0 +1,38 @@
+- name: Deploy Application to Kubernetes
+  hosts: app
+  become: true
+  vars:
+    k8s_dir: /opt/aneki/k8s
+
+  tasks:
+    - name: Ensure manifest directory exists
+      file:
+        path: "{{ k8s_dir }}"
+        state: directory
+
+    - name: Copy SQL init script to server
+      copy:
+        src: "../db_init/db_init.sql"
+        dest: "/tmp/db_init.sql"
+
+    - name: Create ConfigMap for DB Init script
+      shell: |
+        kubectl create configmap postgres-init-config \
+          --from-file=db_init.sql=/tmp/db_init.sql \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Create Registry Secret (if it does not exist)
+      shell: |
+        kubectl create secret docker-registry twc-registry-key \
+          --docker-server={{ registry_host }} \
+          --docker-username={{ registry_user }} \
+          --docker-password={{ registry_token }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Render K8s Manifest
+      template:
+        src: "../k8s/app.yml.j2"
+        dest: "{{ k8s_dir }}/app.yaml"
+
+    - name: Apply Manifests
+      command: kubectl apply -f {{ k8s_dir }}/app.yaml
