@@ -73,12 +73,12 @@ spec:
         - name: backend
           image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
           resources:
-              requests:
-                cpu: "50m"
-                memory: "256Mi"
-              limits:
-                cpu: "100m"
-                memory: "512Mi"
+            requests:
+              cpu: "50m"
+              memory: "256Mi"
+            limits:
+              cpu: "100m"
+              memory: "512Mi"
           env:
             - name: PORT
               value: "8080"
