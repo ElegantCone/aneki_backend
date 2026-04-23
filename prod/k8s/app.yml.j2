@@ -62,14 +62,14 @@ spec:
   selector:
     matchLabels:
       app: backend
-    annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "8080"
   template:
     metadata:
       labels:
         app: backend
+      annotations:
+              prometheus.io/scrape: "true"
+              prometheus.io/path: "/actuator/prometheus"
+              prometheus.io/port: "8080"
     spec:
       imagePullSecrets:
         - name: twc-registry-key
