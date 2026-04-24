@@ -5,43 +5,34 @@
     k8s_dir: /opt/aneki/k8s
 
   tasks:
-    - name: Install Metrics Server
+    - name: Create K8s directory
+      file: { path: "{{ k8s_dir }}", state: directory }
+
+    - name: Install Metrics Server (For HPA)
       shell: |
         kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
         kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 
     - name: Install Helm
-      shell: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        creates: /usr/local/bin/helm
+      shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args: { creates: /usr/local/bin/helm }
 
-    - name: Add Prometheus repo
-      shell: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo update
-
-    - name: Deploy Prometheus
+    - name: Deploy Prometheus Stack (Monitoring)
       shell: |
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo update
         helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
           --namespace monitoring --create-namespace \
-          --set prometheus.prometheusSpec.resources.limits.memory=400Mi \
+          --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+          --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
           --set grafana.service.type=NodePort \
-          --set grafana.service.nodePort=30090 \
-          --set prometheus-node-exporter.enabled=false \
-          --set kube-state-metrics.enabled=false \
-          --set alertmanager.enabled=false
+          --set grafana.service.nodePort=30090
 
-    - name: Copy SQL init script to server
-      copy:
-        src: "../db_init/db_init.sql"
-        dest: "/tmp/db_init.sql"
-
-    - name: Create ConfigMap for DB Init script
+    - name: Create Database ConfigMap
       shell: |
-        kubectl create configmap postgres-init-config \
-          --from-file=db_init.sql=/tmp/db_init.sql \
-          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create configmap postgres-init-config --from-file=db_init.sql=/tmp/db_init.sql --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Create Registry Secret (if it does not exist)
+    - name: Create Registry Secret
       shell: |
         kubectl create secret docker-registry twc-registry-key \
           --docker-server={{ registry_host }} \
@@ -49,10 +40,10 @@
           --docker-password={{ registry_token }} \
           --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Render K8s Manifest
+    - name: Render and Apply Manifest
       template:
         src: "../k8s/app.yml.j2"
         dest: "{{ k8s_dir }}/app.yaml"
 
-    - name: Apply Manifests
+    - name: Apply App
       command: kubectl apply -f {{ k8s_dir }}/app.yaml

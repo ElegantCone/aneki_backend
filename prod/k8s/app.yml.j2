@@ -1,3 +1,4 @@
+# --- POSTGRES DATABASE ---
 apiVersion: v1
 kind: Service
 metadata:
@@ -24,6 +25,10 @@ spec:
       containers:
         - name: postgres
           image: postgres:16
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
           env:
             - name: POSTGRES_DB
               value: "aneki"
@@ -40,20 +45,27 @@ spec:
         - name: init-script
           configMap:
             name: postgres-init-config
+
 ---
+# --- BACKEND SERVICE ---
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
+  labels:
+    app: backend
 spec:
   type: NodePort
   ports:
-    - port: 8080
+    - name: http-metrics
+      port: 8080
       targetPort: 8080
       nodePort: 30081
   selector:
     app: backend
+
 ---
+# --- BACKEND DEPLOYMENT ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -66,10 +78,6 @@ spec:
     metadata:
       labels:
         app: backend
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "8080"
     spec:
       imagePullSecrets:
         - name: twc-registry-key
@@ -81,14 +89,13 @@ spec:
               cpu: "200m"
               memory: "512Mi"
             limits:
-              cpu: "600"
-              memory: "800Mi"
+              cpu: "800m"
+              memory: "1Gi"
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
             initialDelaySeconds: 40
-            periodSeconds: 10
           env:
             - name: PORT
               value: "8080"
@@ -108,6 +115,7 @@ spec:
             - containerPort: 8080
 
 ---
+# --- HORIZONTAL POD AUTOSCALER (HPA) ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -128,6 +136,28 @@ spec:
         averageUtilization: 15
 
 ---
+# --- SERVICE MONITOR
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  namespaceSelector:
+    matchNamespaces:
+      - default
+  endpoints:
+  - port: http-metrics
+    path: /actuator/prometheus
+    interval: 15s
+
+---
+# --- FRONTEND ---
 apiVersion: v1
 kind: Service
 metadata:
