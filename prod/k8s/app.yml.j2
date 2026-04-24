@@ -1,3 +1,4 @@
+# --- POSTGRES DATABASE ---
 apiVersion: v1
 kind: Service
 metadata:
@@ -40,20 +41,27 @@ spec:
         - name: init-script
           configMap:
             name: postgres-init-config
+
 ---
+# --- BACKEND SERVICE ---
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
+  labels:
+    app: backend
 spec:
   type: NodePort
   ports:
-    - port: 8080
+    - name: http-metrics
+      port: 8080
       targetPort: 8080
       nodePort: 30081
   selector:
     app: backend
+
 ---
+# --- BACKEND DEPLOYMENT ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -74,11 +82,16 @@ spec:
           image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
           resources:
             requests:
-              cpu: "100m"
-              memory: "400Mi"
+              cpu: "200m"
+              memory: "512Mi"
             limits:
-              cpu: "500m"
-              memory: "600Mi"
+              cpu: "800m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
           env:
             - name: PORT
               value: "8080"
@@ -98,6 +111,7 @@ spec:
             - containerPort: 8080
 
 ---
+# --- HORIZONTAL POD AUTOSCALER (HPA) ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -108,7 +122,7 @@ spec:
     kind: Deployment
     name: backend
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 3
   metrics:
   - type: Resource
     resource:
@@ -118,6 +132,28 @@ spec:
         averageUtilization: 15
 
 ---
+# --- SERVICE MONITOR ---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  namespaceSelector:
+    matchNames:
+      - default
+  endpoints:
+  - port: http-metrics
+    path: /actuator/prometheus
+    interval: 15s
+
+---
+# --- FRONTEND SERVICE ---
 apiVersion: v1
 kind: Service
 metadata:
@@ -131,6 +167,7 @@ spec:
   selector:
     app: frontend
 ---
+# --- FRONTEND DEPLOYMENT ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
