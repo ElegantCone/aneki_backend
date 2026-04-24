@@ -67,9 +67,9 @@ spec:
       labels:
         app: backend
       annotations:
-              prometheus.io/scrape: "true"
-              prometheus.io/path: "/actuator/prometheus"
-              prometheus.io/port: "8080"
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
     spec:
       imagePullSecrets:
         - name: twc-registry-key
@@ -78,10 +78,10 @@ spec:
           image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
           resources:
             requests:
-              cpu: "250m"
+              cpu: "200m"
               memory: "512Mi"
             limits:
-              cpu: "800m"
+              cpu: "600"
               memory: "800Mi"
           readinessProbe:
             httpGet:
@@ -118,7 +118,7 @@ spec:
     kind: Deployment
     name: backend
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 3
   metrics:
   - type: Resource
     resource:
