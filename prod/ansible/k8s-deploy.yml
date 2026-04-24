@@ -17,22 +17,32 @@
       shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       args: { creates: /usr/local/bin/helm }
 
-    - name: Deploy Prometheus Stack (Monitoring)
+    - name: Add Prometheus repo
+      shell: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo update
+
+    - name: Deploy Prometheus
       shell: |
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-        helm repo update
         helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
           --namespace monitoring --create-namespace \
-          --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
-          --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+          --set prometheus.prometheusSpec.resources.limits.memory=400Mi \
           --set grafana.service.type=NodePort \
-          --set grafana.service.nodePort=30090
+          --set grafana.service.nodePort=30090 \
+          --set prometheus-node-exporter.enabled=false \
+          --set kube-state-metrics.enabled=false \
+          --set alertmanager.enabled=false
 
-    - name: Create Database ConfigMap
+    - name: Copy SQL init script to server
+      copy:
+        src: "../db_init/db_init.sql"
+        dest: "/tmp/db_init.sql"
+
+    - name: Create ConfigMap for DB Init script
       shell: |
-        kubectl create configmap postgres-init-config --from-file=db_init.sql=/tmp/db_init.sql --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create configmap postgres-init-config \
+          --from-file=db_init.sql=/tmp/db_init.sql \
+          --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Create Registry Secret
+    - name: Create Registry Secret (if it does not exist)
       shell: |
         kubectl create secret docker-registry twc-registry-key \
           --docker-server={{ registry_host }} \
@@ -40,10 +50,10 @@
           --docker-password={{ registry_token }} \
           --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Render and Apply Manifest
+    - name: Render K8s Manifest
       template:
         src: "../k8s/app.yml.j2"
         dest: "{{ k8s_dir }}/app.yaml"
 
-    - name: Apply App
+    - name: Apply Manifests
       command: kubectl apply -f {{ k8s_dir }}/app.yaml
