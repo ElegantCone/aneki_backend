@@ -79,7 +79,7 @@ spec:
         - name: twc-registry-key
       containers:
         - name: backend
-          image: {{ registry_host }}/prod/aneki-backend:{{ image_tag }}
+          image: "{{ registry_host }}/prod/aneki-backend:{{ image_tag }}"
           resources:
             requests:
               cpu: "200m"
@@ -153,19 +153,155 @@ spec:
     interval: 15s
 
 ---
+# --- GRAFANA DASHBOARD ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aneki-backend-grafana-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  aneki-backend.json: |
+    {
+      "title": "Aneki Backend",
+      "uid": "aneki-backend",
+      "schemaVersion": 39,
+      "refresh": "15s",
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "tags": ["aneki", "backend"],
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Datasource",
+            "type": "datasource",
+            "hide": 2,
+            "query": "prometheus",
+            "current": {
+              "text": "Prometheus",
+              "value": "prometheus"
+            }
+          },
+          {
+            "name": "pod",
+            "label": "Pod",
+            "type": "query",
+            "datasource": "${datasource}",
+            "query": "label_values(kube_pod_info{pod=~\"backend-.*\"}, pod)",
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*",
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "HTTP requests by pod",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(http_server_requests_seconds_count{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{ '{{' }}pod{{ '}}' }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "HTTP latency p95 by pod",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, pod) (rate(http_server_requests_seconds_bucket{pod=~\"$pod\"}[5m])))",
+              "legendFormat": "{{ '{{' }}pod{{ '}}' }} p95",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "JVM memory by pod",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [
+            {
+              "expr": "sum by (pod, area) (jvm_memory_used_bytes{pod=~\"$pod\"})",
+              "legendFormat": "{{ '{{' }}pod{{ '}}' }} {{ '{{' }}area{{ '}}' }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Process CPU by pod",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "percentunit" } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(process_cpu_usage{pod=~\"$pod\"}[5m]))",
+              "legendFormat": "{{ '{{' }}pod{{ '}}' }}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+
+---
 # --- FRONTEND SERVICE ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
-      nodePort: 30080
   selector:
     app: frontend
+
+---
+# --- FRONTEND INGRESS ---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+
 ---
 # --- FRONTEND DEPLOYMENT ---
 apiVersion: apps/v1
@@ -185,6 +321,6 @@ spec:
         - name: twc-registry-key
       containers:
         - name: frontend
-          image: {{ registry_host }}/prod/aneki-frontend:{{ image_tag }}
+          image: "{{ registry_host }}/prod/aneki-frontend:{{ image_tag }}"
           ports:
             - containerPort: 80

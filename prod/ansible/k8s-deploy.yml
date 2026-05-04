@@ -14,6 +14,16 @@
       shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       args: { creates: /usr/local/bin/helm }
 
+    - name: Deploy NGINX Ingress Controller
+      shell: |
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+          --namespace ingress-nginx --create-namespace \
+          --set controller.hostNetwork=true \
+          --set controller.dnsPolicy=ClusterFirstWithHostNet \
+          --set controller.service.type=ClusterIP
+
     - name: Deploy Prometheus and Grafana
       shell: |
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -21,6 +31,8 @@
         helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
           --namespace monitoring --create-namespace \
           --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+          --set grafana.sidecar.dashboards.enabled=true \
+          --set grafana.sidecar.dashboards.searchNamespace=ALL \
           --set grafana.service.type=NodePort \
           --set grafana.service.nodePort=30090
 
