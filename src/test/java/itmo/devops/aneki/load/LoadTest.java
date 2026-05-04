@@ -1,5 +1,6 @@
 package itmo.devops.aneki.load;
 
+import itmo.devops.aneki.api.dto.JokeResponse;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -28,10 +29,9 @@ public class LoadTest {
 
     public static final ObjectMapper mapper = new ObjectMapper();
 
-    private static final int USERS_COUNT = 20;
+    private static final int USERS_COUNT = 100;
     private static final long DURATION_SECONDS = 120;
-    private static final long SLEEP_MILLIS = 1000;
-    private static final int CREATE_EVERY = 5;
+    private static final long SLEEP_MILLIS = 10;
     private static final long REQUEST_TIMEOUT_SECONDS = 10;
 
     public static void main(String[] args) throws Exception {
@@ -60,8 +60,6 @@ public class LoadTest {
                 }
             });
         }
-
-        executor.shutdown();
         executor.awaitTermination(DURATION_SECONDS + 30L, TimeUnit.SECONDS);
         running.set(false);
     }
@@ -75,25 +73,22 @@ public class LoadTest {
     ) throws IOException, InterruptedException {
         long iteration = 0;
         while (running.get() && Instant.now().isBefore(deadline)) {
-            iteration++;
-            client.send(baseRequest("/api/jokes")
-                    .header("Cookie", COOKIE_NAME + "=" + token).GET().build(), null);
-
-            if (iteration % CREATE_EVERY == 0) {
-                var node = mapper.createObjectNode()
-                        .put("content", String.format("Load test joke worker=%d iteration=%d", workerId, iteration))
-                        .toString();
-                client.send(baseRequest("/api/jokes")
-                        .header("Cookie", COOKIE_NAME + "=" + token).POST(HttpRequest.BodyPublishers.ofString(node)).build(), null);
-            }
-
-            if (SLEEP_MILLIS > 0) {
-                try {
-                    Thread.sleep(SLEEP_MILLIS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
+            var node = mapper.createObjectNode()
+                    .put("content", String.format("Load test joke worker=%d iteration=%d", workerId, iteration))
+                    .toString();
+            try {
+                HttpResponse<String> response = client.send(baseRequest("/api/jokes")
+                        .header("Cookie", COOKIE_NAME + "=" + token).POST(HttpRequest.BodyPublishers.ofString(node)).build(), HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    JokeResponse jokeResponse = mapper.readValue(response.body(), JokeResponse.class);
+                    client.send(baseRequest("/api/jokes/" + jokeResponse.joke().id().toString()).header("Cookie", COOKIE_NAME + "=" + token).DELETE().build(), HttpResponse.BodyHandlers.discarding());
                 }
+                iteration++;
+                if (SLEEP_MILLIS > 0) {
+                    Thread.sleep(SLEEP_MILLIS);
+                }
+            } catch (IOException | InterruptedException e) {
+                System.out.println(e.getMessage());
             }
         }
     }
@@ -101,7 +96,7 @@ public class LoadTest {
     private static String signup(HttpClient client) throws IOException, InterruptedException {
         String email = USER_PREFIX + "-" + System.currentTimeMillis() + "@load.test";
         var node = mapper.createObjectNode()
-                .put("name", "Load Test")
+                .put("name", "LoadTest")
                 .put("email", email)
                 .put("password", PASSWORD)
                 .toString();
