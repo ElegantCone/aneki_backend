@@ -3,8 +3,21 @@
   become: true
   vars:
     k8s_dir: /opt/aneki/k8s
+    app_namespace: default
+    db_user: "{{ lookup('env', 'DB_USER') }}"
+    db_password: "{{ lookup('env', 'DB_PASSWORD') }}"
+    jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
 
   tasks:
+    - name: Validate required secret environment variables
+      assert:
+        that:
+          - db_user | length > 0
+          - db_password | length > 0
+          - jwt_secret | length > 0
+        fail_msg: DB_USER, DB_PASSWORD and JWT_SECRET must be provided through environment variables or Ansible Vault.
+      no_log: true
+
     - name: Install Metrics Server
       shell: |
         kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
@@ -49,13 +62,40 @@
           --from-file=db_init.sql=/tmp/db_init.sql \
           --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Create Registry Secret (if it does not exist)
+    - name: Create application namespace
+      command: kubectl create namespace {{ app_namespace }}
+      register: create_app_namespace
+      failed_when:
+        - create_app_namespace.rc != 0
+        - "'AlreadyExists' not in create_app_namespace.stderr"
+      changed_when: create_app_namespace.rc == 0
+
+    - name: Create database credentials secret
+      shell: |
+        kubectl create secret generic aneki-db \
+          --namespace={{ app_namespace }} \
+          --from-literal=username={{ db_user | quote }} \
+          --from-literal=password={{ db_password | quote }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      no_log: true
+
+    - name: Create application credentials secret
+      shell: |
+        kubectl create secret generic aneki-app \
+          --namespace={{ app_namespace }} \
+          --from-literal=jwt-secret={{ jwt_secret | quote }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      no_log: true
+
+    - name: Create Registry Secret
       shell: |
         kubectl create secret docker-registry twc-registry-key \
+          --namespace={{ app_namespace }} \
           --docker-server={{ registry_host }} \
           --docker-username={{ registry_user }} \
           --docker-password={{ registry_token }} \
           --dry-run=client -o yaml | kubectl apply -f -
+      no_log: true
 
     - name: Render K8s Manifest
       template:
