@@ -4,13 +4,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: aneki
-      POSTGRES_USER: elegantcone
-      POSTGRES_PASSWORD: aneki_password
+      POSTGRES_USER: ${DB_USER:?DB_USER is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./prod/db_init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U elegantcone -d aneki" ]
+      test: [ "CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,9 +26,9 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: aneki
-      DB_USER: elegantcone
-      DB_PASSWORD: aneki_password
-      JWT_SECRET: change-this-prod-secret-to-at-least-32-characters
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CORS_ALLOWED_ORIGIN: "*"
     ports:
       - "8080:8080"

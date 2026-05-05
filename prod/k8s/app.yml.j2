@@ -29,9 +29,15 @@ spec:
             - name: POSTGRES_DB
               value: "aneki"
             - name: POSTGRES_USER
-              value: "elegantcone"
+              valueFrom:
+                secretKeyRef:
+                  name: aneki-db
+                  key: username
             - name: POSTGRES_PASSWORD
-              value: "aneki_password"
+              valueFrom:
+                secretKeyRef:
+                  name: aneki-db
+                  key: password
           ports:
             - containerPort: 5432
           volumeMounts:
@@ -102,11 +108,20 @@ spec:
             - name: DB_NAME
               value: "aneki"
             - name: DB_USER
-              value: "elegantcone"
+              valueFrom:
+                secretKeyRef:
+                  name: aneki-db
+                  key: username
             - name: DB_PASSWORD
-              value: "aneki_password"
+              valueFrom:
+                secretKeyRef:
+                  name: aneki-db
+                  key: password
             - name: JWT_SECRET
-              value: "change-this-prod-secret-to-at-least-32-characters"
+              valueFrom:
+                secretKeyRef:
+                  name: aneki-app
+                  key: jwt-secret
           ports:
             - containerPort: 8080
 
