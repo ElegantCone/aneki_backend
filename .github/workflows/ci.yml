@@ -172,7 +172,7 @@ jobs:
 
       - name: Test frontend
         working-directory: ${{ env.FRONTEND_DIR }}
-        run: npx c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 node --test
+        run: ./node_modules/.bin/c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 node --test
 
       - name: Notify Telegram
         if: always()
@@ -261,7 +261,7 @@ jobs:
 
       - name: Run frontend coverage gate
         working-directory: ${{ env.FRONTEND_DIR }}
-        run: npx c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 --reporter=lcov node --test
+        run: ./node_modules/.bin/c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 --reporter=lcov node --test
 
       - name: Run frontend SonarQube Cloud quality gate
         uses: SonarSource/sonarqube-scan-action@v6
