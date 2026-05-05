@@ -4,8 +4,19 @@
 
   vars:
     docker_user: root
+    db_user: "{{ lookup('env', 'DB_USER') }}"
+    db_password: "{{ lookup('env', 'DB_PASSWORD') }}"
+    jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
 
   tasks:
+    - name: Validate required secret environment variables
+      assert:
+        that:
+          - db_user | length > 0
+          - db_password | length > 0
+          - jwt_secret | length > 0
+        fail_msg: DB_USER, DB_PASSWORD and JWT_SECRET must be provided through environment variables or Ansible Vault.
+      no_log: true
 
     - name: Login to Timeweb Container Registry
       shell: echo "{{ registry_token }}" | docker login {{ registry_host }} -u "{{ registry_user }}" --password-stdin
@@ -16,7 +27,11 @@
         dest: /opt/aneki/.env
         content: |
           IMAGE_TAG={{ image_tag }}
+          DB_USER={{ db_user }}
+          DB_PASSWORD={{ db_password }}
+          JWT_SECRET={{ jwt_secret }}
         mode: "0600"
+      no_log: true
 
     - name: Pull images
       command: docker compose -f /opt/aneki/docker-compose.yaml pull
