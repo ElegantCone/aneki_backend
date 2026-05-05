@@ -322,16 +322,6 @@ jobs:
             ${{ env.REGISTRY_HOST }}/${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY_HOST }}/${{ env.BACKEND_IMAGE }}:latest
 
-      - name: Notify Telegram
-        if: always()
-        continue-on-error: true
-        uses: ./backend/.github/actions/telegram-notify
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          job-name: Build and push backend image
-          job-status: ${{ job.status }}
-
   frontend-release:
     name: Build and push frontend image
     needs:
@@ -348,10 +338,11 @@ jobs:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
 
-  frontend-release-notify:
-    name: Notify frontend release
+  release-notify:
+    name: Notify image release
     runs-on: ubuntu-latest
     needs:
+      - backend-release
       - frontend-release
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master')
     steps:
@@ -366,8 +357,8 @@ jobs:
         with:
           bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          job-name: Build and push frontend image
-          job-status: ${{ needs.frontend-release.result }}
+          job-name: Build and push images (backend ${{ needs.backend-release.result }}, frontend ${{ needs.frontend-release.result }})
+          job-status: ${{ needs.backend-release.result == 'success' && needs.frontend-release.result == 'success' && 'success' || (needs.backend-release.result == 'cancelled' || needs.frontend-release.result == 'cancelled') && 'cancelled' || 'failure' }}
 
   deploy:
     name: Update GitOps manifests
