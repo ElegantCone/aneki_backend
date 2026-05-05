@@ -2,8 +2,10 @@
   hosts: app
   become: true
   vars:
-    k8s_dir: /opt/aneki/k8s
     app_namespace: default
+    argocd_namespace: argocd
+    argocd_install_manifest_url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    argocd_application_manifest_path: /tmp/aneki-argocd-application.yaml
     db_user: "{{ lookup('env', 'DB_USER') }}"
     db_password: "{{ lookup('env', 'DB_PASSWORD') }}"
     jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
@@ -97,10 +99,22 @@
           --dry-run=client -o yaml | kubectl apply -f -
       no_log: true
 
-    - name: Render K8s Manifest
-      template:
-        src: "../k8s/app.yml.j2"
-        dest: "{{ k8s_dir }}/app.yaml"
+    - name: Install Argo CD
+      command: kubectl apply -n {{ argocd_namespace }} -f {{ argocd_install_manifest_url }}
 
-    - name: Apply Manifests
-      command: kubectl apply -f {{ k8s_dir }}/app.yaml
+    - name: Wait for Argo CD server deployment to become available
+      command: kubectl rollout status deployment/argocd-server -n {{ argocd_namespace }} --timeout=180s
+
+    - name: Wait for Argo CD repo server deployment to become available
+      command: kubectl rollout status deployment/argocd-repo-server -n {{ argocd_namespace }} --timeout=180s
+
+    - name: Wait for Argo CD application controller statefulset to become ready
+      command: kubectl rollout status statefulset/argocd-application-controller -n {{ argocd_namespace }} --timeout=180s
+
+    - name: Copy Argo CD application manifest to server
+      copy:
+        src: "../argocd/application.yaml"
+        dest: "{{ argocd_application_manifest_path }}"
+
+    - name: Apply Argo CD application manifest
+      command: kubectl apply -f {{ argocd_application_manifest_path }}
