@@ -48,6 +48,16 @@ jobs:
           path: ${{ env.BACKEND_DIR }}/target/*.jar
           if-no-files-found: error
 
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Backend build
+          job-status: ${{ job.status }}
+
   frontend-build:
     name: Frontend build
     runs-on: ubuntu-latest
@@ -86,6 +96,16 @@ jobs:
           path: ${{ env.FRONTEND_DIR }}/dist
           if-no-files-found: error
 
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Frontend build
+          job-status: ${{ job.status }}
+
   backend-test:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -109,6 +129,16 @@ jobs:
       - name: Test backend
         working-directory: ${{ env.BACKEND_DIR }}
         run: ./mvnw -q test
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Backend tests
+          job-status: ${{ job.status }}
 
   frontend-test:
     name: Frontend tests
@@ -142,13 +172,66 @@ jobs:
 
       - name: Test frontend
         working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm test
+        run: npx c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 node --test
 
-  release:
-    name: Release and deploy
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Frontend tests
+          job-status: ${{ job.status }}
+
+  backend-sonar-scan:
+    name: Backend SonarQube Cloud scan
     runs-on: ubuntu-latest
     needs:
       - backend-test
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.BACKEND_DIR }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/pom.xml
+
+      - name: Run tests, coverage check and SonarQube Cloud quality gate
+        working-directory: ${{ env.BACKEND_DIR }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+        run: |
+          ./mvnw -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization="${SONAR_ORGANIZATION}" \
+            -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
+            -Dsonar.token="${SONAR_TOKEN}" \
+            -Dsonar.qualitygate.wait=true
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Backend SonarQube Cloud scan
+          job-status: ${{ job.status }}
+
+  frontend-sonar-scan:
+    name: Frontend SonarQube Cloud scan
+    runs-on: ubuntu-latest
+    needs:
       - frontend-test
     steps:
       - name: Checkout backend notification action
@@ -163,6 +246,61 @@ jobs:
           ref: ${{ env.FRONTEND_REF }}
           fetch-depth: 0
           path: ${{ env.FRONTEND_DIR }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+
+      - name: Run frontend coverage gate
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npx c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 --reporter=lcov node --test
+
+      - name: Run frontend SonarQube Cloud quality gate
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: ${{ env.FRONTEND_DIR }}
+          args: >
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ secrets.SONAR_FRONTEND_PROJECT_KEY }}
+            -Dsonar.sources=src
+            -Dsonar.tests=test
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.qualitygate.wait=true
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Frontend SonarQube Cloud scan
+          job-status: ${{ job.status }}
+
+  backend-release:
+    name: Build and push backend image
+    runs-on: ubuntu-latest
+    needs:
+      - backend-sonar-scan
+      - frontend-sonar-scan
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.BACKEND_DIR }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -181,40 +319,94 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.REGISTRY_HOST }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.REGISTRY_HOST }}/${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY_HOST }}/${{ env.BACKEND_IMAGE }}:latest
 
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v6
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
         with:
-          context: ${{ env.FRONTEND_DIR }}
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.REGISTRY_HOST }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY_HOST }}/${{ env.FRONTEND_IMAGE }}:latest
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Build and push backend image
+          job-status: ${{ job.status }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+  frontend-release:
+    name: Build and push frontend image
+    needs:
+      - backend-sonar-scan
+      - frontend-sonar-scan
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master'
+    uses: ElegantCone/aneki_frontend/.github/workflows/publish.yml@master
+    with:
+      image_tag: ${{ github.event.client_payload.frontend_sha || github.sha }}
+      ref: ${{ github.event.client_payload.frontend_sha || 'master' }}
+      registry_host: aneki-registry.registry.twcstorage.ru
+      image_name: prod/aneki-frontend
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  frontend-release-notify:
+    name: Notify frontend release
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-release
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master')
+    steps:
+      - name: Checkout backend notification action
+        uses: actions/checkout@v4
         with:
-          python-version: "3.12"
+          path: ${{ env.BACKEND_DIR }}
 
-      - name: Install Ansible
-        run: pip install ansible
+      - name: Notify Telegram
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Build and push frontend image
+          job-status: ${{ needs.frontend-release.result }}
 
-      - name: Set up SSH key
+  deploy:
+    name: Update GitOps manifests
+    runs-on: ubuntu-latest
+    needs:
+      - backend-release
+      - frontend-release
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Update image tags in Kustomize
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          perl -0pi -e 's/(name: aneki-backend\n    newName: [^\n]+\n    newTag: ).*/${1}$ENV{IMAGE_TAG}/' prod/k8s/base/kustomization.yaml
+          perl -0pi -e 's/(name: aneki-frontend\n    newName: [^\n]+\n    newTag: ).*/${1}$ENV{IMAGE_TAG}/' prod/k8s/base/kustomization.yaml
 
-      - name: Deploy to Kubernetes
-        working-directory: ${{ env.BACKEND_DIR }}
-        env:
-          ANSIBLE_HOST_KEY_CHECKING: "False"
+      - name: Commit GitOps update
         run: |
-          ansible-playbook \
-            -i prod/ansible/inventory.ini \
-            prod/ansible/k8s-deploy.yml \
-            --extra-vars "image_tag=${{ github.sha }} registry_host=${{ env.REGISTRY_HOST }} registry_user=${{ secrets.REGISTRY_USERNAME }} registry_token=${{ secrets.REGISTRY_TOKEN }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prod/k8s/base/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "Kustomize images already use ${IMAGE_TAG}"
+            exit 0
+          fi
+          git commit -m "chore: deploy images ${IMAGE_TAG} [skip ci]"
+          git push origin HEAD:master
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Update GitOps manifests
+          job-status: ${{ job.status }}
