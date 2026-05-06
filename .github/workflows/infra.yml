@@ -37,6 +37,13 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Generate Ansible inventory
+        run: |
+          cat > /tmp/inventory.ini <<EOF
+          [app]
+          aneki_prod ansible_host=${{ secrets.SSH_HOST }} ansible_user=root
+          EOF
+
       - name: Run Kubernetes bootstrap playbook
         env:
           DB_USER: ${{ secrets.DB_USER }}
@@ -44,6 +51,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           ansible-playbook \
-            -i prod/ansible/inventory.ini \
+            -i /tmp/inventory.ini \
             prod/ansible/k8s-deploy.yml \
             --extra-vars "registry_host=aneki-registry.registry.twcstorage.ru registry_user=${{ secrets.REGISTRY_USERNAME }} registry_token=${{ secrets.REGISTRY_TOKEN }}"

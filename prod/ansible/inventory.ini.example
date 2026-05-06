@@ -1,0 +1,2 @@
+[app]
+aneki_prod ansible_host=CHANGE_ME ansible_user=root
