@@ -7,7 +7,6 @@ on:
     paths:
       - "prod/ansible/**"
       - "prod/argocd/**"
-      - "prod/k8s/**"
 
 jobs:
   bootstrap-cluster:
