@@ -85,7 +85,11 @@
       shell: |
         kubectl create configmap postgres-init-config \
           --from-file=db_init.sql=/tmp/db_init.sql \
-          --dry-run=client -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | kubectl apply --validate=false -f -
+      register: postgres_init_configmap
+      retries: 5
+      delay: 15
+      until: postgres_init_configmap.rc == 0
 
     - name: Create application namespace
       command: kubectl create namespace {{ app_namespace }}
@@ -101,7 +105,11 @@
           --namespace={{ app_namespace }} \
           --from-literal=username={{ db_user | quote }} \
           --from-literal=password={{ db_password | quote }} \
-          --dry-run=client -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | kubectl apply --validate=false -f -
+      register: aneki_db_secret
+      retries: 5
+      delay: 15
+      until: aneki_db_secret.rc == 0
       no_log: true
 
     - name: Create application credentials secret
@@ -109,7 +117,11 @@
         kubectl create secret generic aneki-app \
           --namespace={{ app_namespace }} \
           --from-literal=jwt-secret={{ jwt_secret | quote }} \
-          --dry-run=client -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | kubectl apply --validate=false -f -
+      register: aneki_app_secret
+      retries: 5
+      delay: 15
+      until: aneki_app_secret.rc == 0
       no_log: true
 
     - name: Create Registry Secret
@@ -119,7 +131,11 @@
           --docker-server={{ registry_host }} \
           --docker-username={{ registry_user }} \
           --docker-password={{ registry_token }} \
-          --dry-run=client -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | kubectl apply --validate=false -f -
+      register: registry_secret
+      retries: 5
+      delay: 15
+      until: registry_secret.rc == 0
       no_log: true
 
     - name: Create Argo CD namespace
@@ -152,4 +168,8 @@
         dest: "{{ argocd_application_manifest_path }}"
 
     - name: Apply Argo CD application manifest
-      command: kubectl apply -f {{ argocd_application_manifest_path }}
+      command: kubectl apply --validate=false -f {{ argocd_application_manifest_path }}
+      register: argocd_application_apply
+      retries: 5
+      delay: 15
+      until: argocd_application_apply.rc == 0
