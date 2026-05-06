@@ -44,7 +44,13 @@ jobs:
           aneki_prod ansible_host=${{ secrets.SSH_HOST }} ansible_user=root
           EOF
 
-      - name: Run Kubernetes bootstrap playbook
+      - name: Install Kubernetes cluster
+        run: |
+          ansible-playbook \
+            -i /tmp/inventory.ini \
+            prod/ansible/k8s-install.yml
+
+      - name: Bootstrap Kubernetes workloads
         env:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}

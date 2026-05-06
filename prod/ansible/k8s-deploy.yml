@@ -20,6 +20,10 @@
         fail_msg: DB_USER, DB_PASSWORD and JWT_SECRET must be provided through environment variables or Ansible Vault.
       no_log: true
 
+    - name: Verify kubectl is installed on the target host
+      command: kubectl version --client
+      changed_when: false
+
     - name: Install Metrics Server
       command: kubectl apply --validate=false -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
       register: metrics_server_install
