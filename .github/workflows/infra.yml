@@ -41,7 +41,7 @@ jobs:
         run: |
           cat > /tmp/inventory.ini <<EOF
           [app]
-          aneki_prod ansible_host=${{ secrets.SSH_HOST }} ansible_user=root
+          aneki_prod ansible_host=${{ secrets.SSH_HOST }} ansible_user=root ansible_ssh_common_args='-o ServerAliveInterval=30 -o ServerAliveCountMax=6'
           EOF
 
       - name: Install Kubernetes cluster

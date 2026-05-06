@@ -58,9 +58,16 @@
         helm repo update
         helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
           --namespace ingress-nginx --create-namespace \
+          --wait \
+          --atomic \
+          --timeout 10m \
           --set controller.hostNetwork=true \
           --set controller.dnsPolicy=ClusterFirstWithHostNet \
           --set controller.service.type=ClusterIP
+      register: ingress_nginx_install
+      retries: 5
+      delay: 20
+      until: ingress_nginx_install.rc == 0
 
     - name: Deploy Prometheus and Grafana
       shell: |
@@ -68,6 +75,9 @@
         helm repo update
         helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
           --namespace monitoring --create-namespace \
+          --wait \
+          --atomic \
+          --timeout 15m \
           --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
           --set prometheus.prometheusSpec.scrapeInterval=2s \
           --set prometheus.prometheusSpec.evaluationInterval=2s \
@@ -75,6 +85,10 @@
           --set grafana.sidecar.dashboards.searchNamespace=ALL \
           --set grafana.service.type=NodePort \
           --set grafana.service.nodePort=30090
+      register: monitoring_install
+      retries: 3
+      delay: 30
+      until: monitoring_install.rc == 0
 
     - name: Copy SQL init script to server
       copy:

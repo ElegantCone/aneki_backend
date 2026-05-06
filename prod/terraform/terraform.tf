@@ -35,8 +35,8 @@ resource "twc_server" "vm" {
   configuration {
     configurator_id = data.twc_configurator.configurator.id
     disk = 1024 * 15
-    cpu = 2
-    ram = 1024 * 2
+    cpu = 4
+    ram = 1024 * 4
   }
 }
 
