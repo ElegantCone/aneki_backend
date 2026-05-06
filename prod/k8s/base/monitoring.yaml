@@ -88,7 +88,7 @@ data:
           "targets": [
             {
               "expr": "sum by (pod) (rate(http_server_requests_seconds_count{pod=~\"$pod\"}[5m]))",
-              "legendFormat": "{{ '{{' }}pod{{ '}}' }}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ]
@@ -112,7 +112,7 @@ data:
           "targets": [
             {
               "expr": "sum by (pod, area) (jvm_memory_used_bytes{pod=~\"$pod\"})",
-              "legendFormat": "{{ '{{' }}pod{{ '}}' }} {{ '{{' }}area{{ '}}' }}",
+              "legendFormat": "{{pod}} {{area}}",
               "refId": "A"
             }
           ]
@@ -136,8 +136,68 @@ data:
           "targets": [
             {
               "expr": "sum by (pod) (rate(process_cpu_usage{pod=~\"$pod\"}[5m]))",
-              "legendFormat": "{{ '{{' }}pod{{ '}}' }}",
+              "legendFormat": "{{pod}}",
               "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Active backend pods",
+          "type": "stat",
+          "datasource": "${datasource}",
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 16,
+            "y": 8
+          },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_status_phase{namespace=\"default\",pod=~\"backend-.*\",phase=\"Running\"})",
+              "instant": true,
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Active backend pod list",
+          "type": "table",
+          "datasource": "${datasource}",
+          "gridPos": {
+            "h": 8,
+            "w": 18,
+            "x": 0,
+            "y": 16
+          },
+          "targets": [
+            {
+              "expr": "kube_pod_status_phase{namespace=\"default\",pod=~\"backend-.*\",phase=\"Running\"} == 1",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "labelsToFields",
+              "options": {
+                "mode": "columns"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "instance": true,
+                  "service": true,
+                  "uid": true
+                },
+                "renameByName": {
+                  "pod": "Pod"
+                }
+              }
             }
           ]
         }
