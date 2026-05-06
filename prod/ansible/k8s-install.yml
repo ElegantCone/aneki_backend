@@ -32,7 +32,7 @@
 
     - name: Install dependencies
       apt:
-        name: [ apt-transport-https, ca-certificates, curl, gpg, conntrack ]
+        name: [ apt-transport-https, ca-certificates, curl, gpg, conntrack, containerd ]
         state: present
         update_cache: true
 
@@ -43,6 +43,8 @@
 
     - name: Generate default containerd config
       shell: containerd config default > /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
 
     - name: Set SystemdCgroup to true in containerd
       replace:
