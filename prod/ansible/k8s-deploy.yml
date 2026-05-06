@@ -131,7 +131,7 @@
       changed_when: create_argocd_namespace.rc == 0
 
     - name: Install Argo CD
-      command: kubectl apply --validate=false -n {{ argocd_namespace }} -f {{ argocd_install_manifest_url }}
+      command: kubectl apply --server-side --force-conflicts --validate=false -n {{ argocd_namespace }} -f {{ argocd_install_manifest_url }}
       register: argocd_install
       retries: 5
       delay: 15
