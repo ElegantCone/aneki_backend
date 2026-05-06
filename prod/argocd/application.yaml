@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/ElegantCone/aneki.git
+    repoURL: https://github.com/ElegantCone/aneki_backend.git
     targetRevision: master
     path: prod/k8s/base
   destination:
