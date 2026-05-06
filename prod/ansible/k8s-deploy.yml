@@ -37,7 +37,11 @@
       changed_when: false
 
     - name: Patch metrics-server to allow insecure kubelet TLS
-      command: kubectl patch deployment metrics-server -n kube-system --type=json -p=[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]
+      shell: |
+        kubectl patch deployment metrics-server \
+          -n kube-system \
+          --type='json' \
+          -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
       when: "'--kubelet-insecure-tls' not in metrics_server_args.stdout"
       register: metrics_server_patch
       retries: 5
