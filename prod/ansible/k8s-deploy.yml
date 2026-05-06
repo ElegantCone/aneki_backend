@@ -21,9 +21,24 @@
       no_log: true
 
     - name: Install Metrics Server
-      shell: |
-        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-        kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+      command: kubectl apply --validate=false -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+      register: metrics_server_install
+      retries: 5
+      delay: 15
+      until: metrics_server_install.rc == 0
+
+    - name: Check whether metrics-server already uses insecure kubelet TLS
+      command: kubectl get deployment metrics-server -n kube-system -o jsonpath={.spec.template.spec.containers[0].args}
+      register: metrics_server_args
+      changed_when: false
+
+    - name: Patch metrics-server to allow insecure kubelet TLS
+      command: kubectl patch deployment metrics-server -n kube-system --type=json -p=[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]
+      when: "'--kubelet-insecure-tls' not in metrics_server_args.stdout"
+      register: metrics_server_patch
+      retries: 5
+      delay: 10
+      until: metrics_server_patch.rc == 0
 
     - name: Install Helm
       shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -99,8 +114,20 @@
           --dry-run=client -o yaml | kubectl apply -f -
       no_log: true
 
+    - name: Create Argo CD namespace
+      command: kubectl create namespace {{ argocd_namespace }}
+      register: create_argocd_namespace
+      failed_when:
+        - create_argocd_namespace.rc != 0
+        - "'AlreadyExists' not in create_argocd_namespace.stderr"
+      changed_when: create_argocd_namespace.rc == 0
+
     - name: Install Argo CD
-      command: kubectl apply -n {{ argocd_namespace }} -f {{ argocd_install_manifest_url }}
+      command: kubectl apply --validate=false -n {{ argocd_namespace }} -f {{ argocd_install_manifest_url }}
+      register: argocd_install
+      retries: 5
+      delay: 15
+      until: argocd_install.rc == 0
 
     - name: Wait for Argo CD server deployment to become available
       command: kubectl rollout status deployment/argocd-server -n {{ argocd_namespace }} --timeout=180s
