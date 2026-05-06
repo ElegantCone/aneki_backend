@@ -15,7 +15,7 @@ configMapGenerator:
 images:
   - name: aneki-backend
     newName: aneki-registry.registry.twcstorage.ru/prod/aneki-backend
-    newTag: ba140824e936254c2c7dfb1dddf7f49ac73be5c6
+    newTag: 0dffeda847f1a211362a8443e35db2527501fc55
   - name: aneki-frontend
     newName: aneki-registry.registry.twcstorage.ru/prod/aneki-frontend
-    newTag: ba140824e936254c2c7dfb1dddf7f49ac73be5c6
+    newTag: 0dffeda847f1a211362a8443e35db2527501fc55
