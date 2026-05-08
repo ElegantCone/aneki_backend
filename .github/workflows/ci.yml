@@ -20,98 +20,9 @@ env:
   FRONTEND_IMAGE: prod/aneki-frontend
 
 jobs:
-  backend-build:
-    name: Backend build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout backend
-        uses: actions/checkout@v4
-        with:
-          path: ${{ env.BACKEND_DIR }}
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-          cache-dependency-path: ${{ env.BACKEND_DIR }}/pom.xml
-
-      - name: Build backend
-        working-directory: ${{ env.BACKEND_DIR }}
-        run: ./mvnw -q package -DskipTests
-
-      - name: Upload backend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: ${{ env.BACKEND_DIR }}/target/*.jar
-          if-no-files-found: error
-
-      - name: Notify Telegram
-        if: always()
-        continue-on-error: true
-        uses: ./backend/.github/actions/telegram-notify
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          job-name: Backend build
-          job-status: ${{ job.status }}
-
-  frontend-build:
-    name: Frontend build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout backend notification action
-        uses: actions/checkout@v4
-        with:
-          path: ${{ env.BACKEND_DIR }}
-
-      - name: Checkout frontend
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.FRONTEND_REPOSITORY }}
-          ref: ${{ env.FRONTEND_REF }}
-          path: ${{ env.FRONTEND_DIR }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm run build
-
-      - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: ${{ env.FRONTEND_DIR }}/dist
-          if-no-files-found: error
-
-      - name: Notify Telegram
-        if: always()
-        continue-on-error: true
-        uses: ./backend/.github/actions/telegram-notify
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          job-name: Frontend build
-          job-status: ${{ job.status }}
-
   backend-test:
     name: Backend tests
     runs-on: ubuntu-latest
-    needs:
-      - backend-build
-      - frontend-build
     steps:
       - name: Checkout backend
         uses: actions/checkout@v4
@@ -138,50 +49,6 @@ jobs:
           bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           job-name: Backend tests
-          job-status: ${{ job.status }}
-
-  frontend-test:
-    name: Frontend tests
-    runs-on: ubuntu-latest
-    needs:
-      - backend-build
-      - frontend-build
-    steps:
-      - name: Checkout backend notification action
-        uses: actions/checkout@v4
-        with:
-          path: ${{ env.BACKEND_DIR }}
-
-      - name: Checkout frontend
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.FRONTEND_REPOSITORY }}
-          ref: ${{ env.FRONTEND_REF }}
-          path: ${{ env.FRONTEND_DIR }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: npm ci
-
-      - name: Test frontend
-        working-directory: ${{ env.FRONTEND_DIR }}
-        run: ./node_modules/.bin/c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 node --test
-
-      - name: Notify Telegram
-        if: always()
-        continue-on-error: true
-        uses: ./backend/.github/actions/telegram-notify
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          job-name: Frontend tests
           job-status: ${{ job.status }}
 
   backend-sonar-scan:
@@ -226,6 +93,89 @@ jobs:
           bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           job-name: Backend SonarQube Cloud scan
+          job-status: ${{ job.status }}
+
+  backend-build:
+    name: Backend build
+    runs-on: ubuntu-latest
+    needs:
+      - backend-sonar-scan
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.BACKEND_DIR }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/pom.xml
+
+      - name: Build backend
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: ./mvnw -q package -DskipTests
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: ${{ env.BACKEND_DIR }}/target/*.jar
+          if-no-files-found: error
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Backend build
+          job-status: ${{ job.status }}
+
+  frontend-test:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    needs:
+      - backend-build
+    steps:
+      - name: Checkout backend notification action
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.BACKEND_DIR }}
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FRONTEND_REPOSITORY }}
+          ref: ${{ env.FRONTEND_REF }}
+          path: ${{ env.FRONTEND_DIR }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+
+      - name: Test frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: ./node_modules/.bin/c8 --check-coverage --lines 80 --branches 80 --functions 80 --statements 80 node --test
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Frontend tests
           job-status: ${{ job.status }}
 
   frontend-sonar-scan:
@@ -288,12 +238,62 @@ jobs:
           job-name: Frontend SonarQube Cloud scan
           job-status: ${{ job.status }}
 
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-test
+    steps:
+      - name: Checkout backend notification action
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.BACKEND_DIR }}
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FRONTEND_REPOSITORY }}
+          ref: ${{ env.FRONTEND_REF }}
+          path: ${{ env.FRONTEND_DIR }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: ${{ env.FRONTEND_DIR }}/dist
+          if-no-files-found: error
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./backend/.github/actions/telegram-notify
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          job-name: Frontend build
+          job-status: ${{ job.status }}
+
   backend-release:
     name: Build and push backend image
     runs-on: ubuntu-latest
     needs:
-      - backend-sonar-scan
-      - frontend-sonar-scan
+      - frontend-build
+      - backend-build
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master'
     permissions:
       contents: read
@@ -326,8 +326,8 @@ jobs:
   frontend-release:
     name: Build and push frontend image
     needs:
-      - backend-sonar-scan
-      - frontend-sonar-scan
+      - backend-build
+      - frontend-build
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.ref == 'refs/heads/master'
     uses: ElegantCone/aneki_frontend/.github/workflows/publish.yml@master
     with:
